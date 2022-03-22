@@ -1,0 +1,65 @@
+Install Velero Backup
+1.	Download Velero v1.8.1 from Github Realease
+Curl -LO https://github.com/vmware-tanzu/velero/releases/download/v1.8.1/velero-v1.8.1-linux-amd64.tar.gz
+Kiểm tra xem file có phải là file nén hay ko ?
+[root@CentOS8 velero]# file velero-v1.8.1-linux-amd64.tar.gz
+velero-v1.8.1-linux-amd64.tar.gz: gzip compressed data, original size 71925248
+tar -xf velero-v1.8.1-linux-amd64.tar.gz
+Sau khi giải nén ta sẽ có thư mục velero-v1.8.1-linux-amd64
+
+2.	Move file velero trong thư mục velero-v1.8.1-linux-amd64 vào /usr/local/bin/ -> để mọi user có thể dung lệnh velero
+cp ~/ velero-v1.8.1-linux-amd64/velero /usr/local/bin/ 
+
+3.	Có 2 trường hợp khi sử dụng Velero: local, và trên Azure AKS
+A.	Local:
+https://github.com/replicatedhq/local-volume-provider
+https://www.ibm.com/docs/en/spp/10.1.7?topic=support-installing-configuring-velero
+
+Bạn phải build Plugin Local Volume Provider de sử dụng ở local
+
+B.	Install Velero tren Aks (yêu cầu  az login, để vào Azure trước):
+
+Mục đích: Là backup K8S tren Centos len Azure Storage Account
+
+-	Cài Azure CLI on Centos8: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli-linux?pivots=dnf
+-	Móc vào AKS:
+az aks get-credentials --name YOUR AKS CLUSTER --resource-group  Your Group  --subscription "YOUR-SUBCRIPTION”
+-	Ở đây mình sử dụng MINIKUBE tren Centos 8 (local)
+-	Tạo môi trường Variables để install Velero trên AKS
+https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure
+Tạo file credentials-velero
+cat << EOF  > ~/velero-bk/credentials-velero
+AZURE_STORAGE_ACCOUNT_ACCESS_KEY=${AZURE_STORAGE_ACCOUNT_ACCESS_KEY}
+AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID}
+AZURE_TENANT_ID=${AZURE_TENANT_ID}
+AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP}
+AZURE_CLOUD_NAME=AzurePublicCloud
+EOF
+	
+Copy and Paste các lệnh sau để tạo môi trường Variables trước khi Install
+AZURE_SUBSCRIPTION_ID=”Tu dien thong tin”
+AZURE_TENANT_ID=”Tu dien thong tin”
+AZURE_RESOURCE_GROUP=”Tu dien thong tin”
+AZURE_STORAGE_ACCOUNT_ID=”Tu dien thong tin” -> StorageAccount Name
+BLOB_CONTAINER=”Tu dien thong tin” -> Blob Container trong Storage
+AZURE_STORAGE_ACCOUNT_ACCESS_KEY=”Storage Access Key”
+
+Install VELERO với thông số bên trên
+velero install \
+--provider azure \
+--plugins velero/velero-plugin-for-microsoft-azure:v1.4.0 \
+--bucket $BLOB_CONTAINER \
+--secret-file ~/velero-bk/credentials-velero \
+--backup-location-config resourceGroup=$AZURE_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID,storageAccountKeyEnvVar=AZURE_STORAGE_ACCOUNT_ACCESS_KEY,subscriptionId=$AZURE_SUBSCRIPTION_ID \
+--use-volume-snapshots=false
+
+
+4.	Tiến hành Backup Test
+
+-	Vui long deploy test service
+https://github.com/loctran1991/wp-project
+
+-	Ở đây sẽ backup 2 app: mysql và wordpress
+
+velero backup create mysql-backup --selector app=mysql
+velero backup create wordpress-backup --selector app=wordpress
