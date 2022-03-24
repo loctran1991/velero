@@ -1,0 +1,42 @@
+Backup and Restore K8S with Velero
+After installing Velero, We will test Backup and Restore a Service
+We have 3 service: mysql, wordpress, mongodb + mongo-express
+
+If you don’t have it, please deloy them
+https://github.com/loctran1991/wp-project
+https://github.com/loctran1991/mongodb
+
+1.	Backup service
+-	Backup mongdb and mongo-express
+velero backup create mongodb-backup --selector app=mongodb,mongo-express
+
+-	Backup wordpress
+velero backup create mongodb-backup --selector app=wordpress
+
+-	Backup mysql
+velero backup create mongodb-backup --selector app=mysql
+
+2.	Delete “mysql” to test restoration
+Kubectl delete deployment mysql
+Kubectl delete pvc mysql-volume
+Kubectl delete pvc mysql-volume-claim
+
+Lúc này 2 lệnh Delete Volume sẽ bị treo với Status “Terminating”
+Cách giải quyết thì chạy lệnh sau:
+Syntax: kubectl patch pvc {PVC_NAME} -p '{"metadata":{"finalizers":null}}'
+kubectl patch pvc mysql-volume-claim -p '{"metadata":{"finalizers":null}}'
+
+3.	Restore from backup “mysql-backup”
+Velero restore create –from-backup mysql-backup
+NOTE: Khi Velero Restore nó sẽ restore cả Database bạn create trong POD như bài Install Wordpress
+Sau khi Restore thì truy cập lại bình thường
+
+4.	Tạo Schedule Backup, để backup mỗi ngày, do mỗi ngày đều có sự thay đổi
+https://velero.io/docs/v1.8/how-velero-works/#scheduled-backups
+velero schedule create example-schedule --schedule="0 3 * * *" --ttl 72h0m0s
+Tên backup: example-schedule
+“0 3 * * *” :  Thời gian backup là 3am mỗi ngày, và backup sẽ chạy vào ngày kế tiep
+--ttl 72h0m0s : Giữ lại những bản backup trong vòn 72h, backup nào cũ sẽ bị xóa
+
+Khi restore: 
+Velero restore create –from-schedule [tên schedule]-[timestamp]
